@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나만의 구글 드라이브 게시판</title>
+    <!-- 구글 Identity Services 라이브러리 로드 -->
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()" async defer></script>
+    <style>
+        body {
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        /* 로그인 화면 스타일 */
+        #login-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 50px 0;
+        }
+        .login-btn {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+        .login-btn:hover { background-color: #357AE8; }
+
+        /* 게시판 화면 스타일 (초기엔 숨김) */
+        #board-section {
+            display: none;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .form-group input[type="text"], 
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            resize: vertical;
+            height: 100px;
+        }
+        .submit-btn {
+            background-color: #0F9D58;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .submit-btn:hover { background-color: #0B8043; }
+        .user-info {
+            text-align: right;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. 로그인 섹션 -->
+        <div id="login-section">
+            <h1>내 구글 드라이브 게시판</h1>
+            <p>글과 사진을 업로드하려면 구글 계정으로 로그인하세요.</p>
+            <button class="login-btn" onclick="handleAuthClick()">Google 계정으로 로그인</button>
+        </div>
+
+        <!-- 2. 게시판 섹션 (로그인 성공 시 표시됨) -->
+        <div id="board-section">
+            <div class="user-info" id="user-status">로그인 완료됨</div>
+            <h1>새 글 작성</h1>
+            
+            <div class="form-group">
+                <label for="post-title">제목</label>
+                <input type="text" id="post-title" placeholder="제목을 입력하세요">
+            </div>
+            
+            <div class="form-group">
+                <label for="post-content">내용</label>
+                <textarea id="post-content" placeholder="내용을 입력하세요"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="post-file">사진 첨부 (PT 폴더로 업로드)</label>
+                <input type="file" id="post-file" accept="image/*">
+            </div>
+
+            <button class="submit-btn" onclick="uploadPost()">업로드 하기</button>
+        </div>
+    </div>
+
+    <script>
+        // ★중요: 구글 클라우드 콘솔에서 발급받은 클라이언트 ID를 입력해야 합니다.
+        const CLIENT_ID = '여기에_클라이언트_ID를_입력하세요.apps.googleusercontent.com';
+        
+        // 구글 드라이브 업로드 및 스프레드시트 기록을 위한 권한(Scope) 설정
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
+        
+        let tokenClient;
+        let accessToken = null;
+
+        // 구글 로그인 라이브러리가 로드되면 실행되는 초기화 함수
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        accessToken = tokenResponse.access_token;
+                        showBoard(); // 로그인 성공 시 게시판 화면 표시
+                    }
+                },
+            });
+        }
+
+        // 로그인 버튼 클릭 시 실행
+        function handleAuthClick() {
+            // 구글 로그인 팝업 호출
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        }
+
+        // 로그인 성공 후 화면 전환
+        function showBoard() {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('board-section').style.display = 'block';
+            console.log("로그인 성공! Access Token 발급 완료");
+        }
+
+        // 업로드 버튼 클릭 시 실행 (드라이브 및 시트 API 연동 로직이 들어갈 자리)
+        async function uploadPost() {
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+            const fileInput = document.getElementById('post-file').files[0];
+
+            if (!title || !content) {
+                alert("제목과 내용을 모두 입력해주세요.");
+                return;
+            }
+
+            alert("업로드를 시작합니다! (실제 업로드를 위해 API 연결이 필요합니다.)\n제목: " + title);
+            
+            // ---------------------------------------------------------
+            // 차후 이곳에 fetch() 함수를 이용해 아래 작업을 수행하는 코드를 추가합니다.
+            // 1. 구글 드라이브 API 호출 -> 선택한 파일(fileInput)을 'PT' 폴더에 업로드
+            // 2. 구글 드라이브에서 리턴받은 이미지 링크(URL) 확보
+            // 3. 구글 스프레드시트 API 호출 -> [제목, 내용, 이미지URL, 날짜] 한 줄 추가
+            // ---------------------------------------------------------
+        }
+    </script>
+</body>
+</html>
